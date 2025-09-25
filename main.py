@@ -6,9 +6,15 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import PydanticOutputParser
 from langchain.agents import create_tool_calling_agent, AgentExecutor
 from tools import search_tool, wiki_tool, save_tool
+from flask import Flask, request, jsonify
+from flask_cors import CORS
+import os 
 
-load_dotenv("/Users/ilinaiyer/My-Learning-Assistant/sample.env")
+load_dotenv()
+print(os.getenv("OPENAI_API_KEY"))
 
+app = Flask(__name__)
+CORS(app)
 
 llm = ChatOpenAI(
     model="gpt-4o-mini",
@@ -42,26 +48,26 @@ agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=True)
 chat_history = []
 print("Welcome to speech therapy, type 'exit' to quit")
 
-initial_query = "Let's start reading comprehension exercises."
-raw_response = agent_executor.invoke({"query": initial_query, "chat_history": chat_history})
-bot_output = raw_response["output"]
-print("Bot:", bot_output)
+@app.route("/chat", methods=["POST"])
+def chat():
+    global chat_history
+    data = request.get_json()
+    query = data.get("message", "")
 
-chat_history.append({"role": "user", "content": initial_query})
-chat_history.append({"role": "assistant", "content": bot_output})
-
-while True:
-    query = input("You: ")
-    if query.lower() == "exit":
-        break
-
-    raw_response = agent_executor.invoke({"query": query, "chat_history": chat_history})
+    raw_response = agent_executor.invoke({
+        "query":query,
+        "chat_history": chat_history
+    })
     bot_output = raw_response["output"]
-    print("Bot:", bot_output)
 
     chat_history.append({"role": "user", "content": query})
-    chat_history.append({"role": "assistant", "content": bot_output})
+    chat_history.append({"role":"assistant", "content": bot_output})
 
+    return jsonify({"reply": bot_output, "chat_history": chat_history})
+
+
+if __name__ == "__main__":
+    app.run(port=5001, debug=True)
     
 
 
